@@ -1,0 +1,69 @@
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Environment files and Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Logs and Databases
+*.log
+*.sqlite
+*.sqlite-journal
+
+# PHP / Composer / Laravel
+apps/api/vendor/
+apps/api/bootstrap/cache/
+apps/api/storage/*.key
+apps/api/storage/framework/cache/*
+apps/api/storage/framework/sessions/*
+apps/api/storage/framework/views/*
+apps/api/storage/logs/*
+apps/api/.env
+apps/api/.env.backup
+apps/api/.env.production
+apps/api/.phpunit.result.cache
+!apps/api/storage/framework/cache/.gitignore
+!apps/api/storage/framework/sessions/.gitignore
+!apps/api/storage/framework/views/.gitignore
+!apps/api/storage/logs/.gitignore
+
+# Flutter / Dart
+apps/client/.dart_tool/
+apps/client/.flutter-plugins
+apps/client/.flutter-plugins-dependencies
+apps/client/.packages
+apps/client/.pub-cache/
+apps/client/.pub/
+apps/client/build/
+apps/client/ios/Pods/
+apps/client/ios/.symlinks/
+apps/client/android/.gradle/
+apps/client/android/local.properties
+apps/client/android/app/release/
+apps/client/windows/flutter/ephemeral/
+apps/client/linux/flutter/ephemeral/
+apps/client/*.iml
+packages/*/.dart_tool/
+packages/*/build/
+
+# Docker Local Data Volumes
+infra/docker/data/

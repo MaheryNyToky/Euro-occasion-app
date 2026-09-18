@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-validate:
+    name: Lint & Structure Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          docker compose -f infra/docker/docker-compose.yml config
+
+      - name: Check required directories
+        run: |
+          for dir in apps/api apps/client packages/api_contract packages/design_system database/migrations infra/docker docs; do
+            if [ ! -d "$dir" ]; then
+              echo "Error: Directory $dir is missing!"
+              exit 1
+            fi
+          done
+          echo "All required directories exist."
