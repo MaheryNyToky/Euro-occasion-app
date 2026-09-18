@@ -46,35 +46,71 @@ Terminé
   - Middleware de traçabilité globale `EnsureRequestId` (`apps/api/app/Http/Middleware/EnsureRequestId.php`)
   - Formatage JSON standardisé avec corrélation `request_id` dans `bootstrap/app.php`
   - Migrations PostgreSQL avec clés primaires UUID :
-    - `0001_01_01_000000_create_tenants_table.php` (table `tenants`, devise comptable par défaut 'MGA', timezone 'Indian/Antananarivo')
-    - `0001_01_01_000001_create_users_table.php` (table `users` avec restriction de suppression tenant et contrainte d'unicité `(tenant_id, email)`)
-    - `0001_01_01_000002_create_devices_table.php` (table `devices` avec plateforme windows/android/web et index composé `(tenant_id, device_identifier)`)
-    - `0001_01_01_000003_create_audit_events_table.php` (table `audit_events` immuable/append-only avec payloads JSONB et index d'audit)
-    - `2026_09_18_212659_create_personal_access_tokens_table.php` adapté avec `uuidMorphs`
-  - Modèles Eloquent & Services :
-    - Modèles `Tenant`, `User`, `Device`, `AuditEvent`
-    - Trait `BelongsToTenant` et Scope global `TenantScope`
-    - Service `TenantContext` pour gestion du contexte tenant
-    - Service `AuditService` pour l'enregistrement standardisé et immuable des audits
-  - Endpoint de diagnostic et santé :
-    - `HealthController` et route `/api/v1/health` vérifiant la connectivité PostgreSQL et Redis
+    - `0001_01_01_000000_create_tenants_table.php`
+    - `0001_01_01_000001_create_users_table.php`
+    - `0001_01_01_000002_create_devices_table.php`
+    - `0001_01_01_000003_create_audit_events_table.php`
+    - `2026_09_18_212659_create_personal_access_tokens_table.php`
+  - Modèles Eloquent & Services (`Tenant`, `User`, `Device`, `AuditEvent`, `BelongsToTenant`, `TenantScope`, `TenantContext`, `AuditService`)
+  - Endpoint `/api/v1/health` avec vérification de PostgreSQL et Redis
 - **Client Flutter (`apps/client`)** :
-  - Initialisation de l'application Flutter multiplateforme (`windows`, `android`, `web`)
-  - Mise en place de la structure `lib/core/config/app_config.dart`
+  - Application multiplateforme Windows, Android, Web initialisée
+  - Architecture feature-first configurée (`app_config.dart`)
 - **Tests** :
-  - `HealthCheckTest` (vérification de la réponse 200, db connectée, redis connecté, headers `X-Request-Id`)
-  - `TenantIsolationTest` (vérification de l'isolation stricte des données entre tenants distincts et unicité email par tenant)
-  - `AuditEventTest` (vérification de l'enregistrement et de l'interdiction de modification/suppression append-only)
-  - `widget_test.dart` et `flutter analyze` côté client Flutter
+  - `HealthCheckTest`, `TenantIsolationTest`, `AuditEventTest` (6 tests, 27 assertions : tous validés sur PostgreSQL)
+  - `flutter test` et `flutter analyze` réussis sans avertissement
 
 ## Tests
-- Tests automatisés Laravel / PHPUnit : 6 tests, 27 assertions, tous validés avec succès (`passed: 6, assertions: 27`).
-- Tests et analyse Flutter : `flutter test` réussi (1/1 passed) et `flutter analyze` sans avertissement ni erreur (`No issues found!`).
+- PHPUnit / PostgreSQL : 6/6 passés.
+- Flutter : 1/1 passé, 0 analyse issue.
 
 ## Décisions
-- Clés primaires UUID généralisées sur toutes les tables du domaine pour garantir la compatibilité avec la création de données hors-ligne et la synchronisation.
-- Enregistrement d'audit en append-only strict : interception des événements `updating` et `deleting` dans le modèle `AuditEvent` avec levée de `RuntimeException`.
-- Base de données dédiée aux tests `eurocasion_testing` créée dans PostgreSQL pour tester fidèlement les comportements relationnels et types PostgreSQL (JSONB, UUID).
+- Clés primaires UUID généralisées.
+- Interdiction stricte de mise à jour et suppression des événements d'audit (append-only immuable).
+
+## Problèmes
+- Aucun.
+
+---
+
+## Étape
+Phase 2 — Authentification, sessions d'appareils et permissions (RBAC & Périmètres)
+
+## Statut
+Terminé
+
+## Modifications
+- **Schéma RBAC PostgreSQL (`database/migrations/0001_01_01_000004_create_rbac_tables.php`)** :
+  - Table `permissions` (UUID, nom, code unique, catégorie, description)
+  - Table `roles` (UUID, tenant_id nullable, nom, code unique par tenant, is_system)
+  - Table pivot `role_permissions` (role_id, permission_id)
+  - Table `user_roles` (UUID, tenant_id, user_id, role_id, `scope_type`, `scope_id`) pour le support des portées de données
+- **Modèles Eloquent & Autorisation** :
+  - Modèles `Permission`, `Role`, `UserRole`
+  - Méthodes sur `User` : `assignRole()`, `hasRole()`, `hasPermissionTo($permission, $scopeType, $scopeId)`, `getAllPermissions()`
+- **Sécurité, Middleware & Rate Limiting** :
+  - `LoginRequest` avec limitation de débit (5 tentatives par minute par IP/email)
+  - `AuthenticateWithTenant` middleware validant l'état actif de l'utilisateur, l'état actif du tenant, initialisant le `TenantContext`, et bloquant tout appareil révoqué (`is_revoked === true`)
+  - `CheckPermission` middleware pour protéger les routes avec vérification des permissions et portées de périmètre
+  - Gestion des exceptions dans `bootstrap/app.php` (401, 403, 404, 422, 500 corrélées par `request_id`)
+  - Résolution robuste et sécurisée de `device_id` en UUID dans `AuditService`
+- **Contrôleurs et Routes API** :
+  - `AuthController` (`login`, `refresh`, `logout`, `me`) avec journalisation d'audit automatique (`auth.login`, `auth.logout`) et enregistrement d'appareil
+  - `DeviceController` (`index`, `destroy`) avec révocation d'appareil et invalidation de ses jetons d'accès
+  - Routes exposées sous `/api/v1/auth/*` et `/api/v1/devices`
+- **Tests** :
+  - `AuthTest` : 7 tests (login réussi avec terminal, rejet mauvais identifiants/tenant/statut, me, refresh de token, révocation à la déconnexion)
+  - `DeviceManagementTest` : 1 test complet (liste des appareils, révocation, blocage 403 d'un appareil révoqué avec audit)
+  - `PermissionTest` : 2 tests complets (permission globale, protection permission sensible, permission restreinte à un scope entrepôt avec refus sur un autre entrepôt)
+
+## Tests
+- PHPUnit / PostgreSQL (`eurocasion_testing`) : **16 tests, 89 assertions, 100% passés**.
+- Flutter (`apps/client`) : `flutter test` réussi, `flutter analyze` sans avertissement (`No issues found!`).
+
+## Décisions
+- Résolution du `X-Device-Id` textuel vers l'UUID `id` dans la table `devices` pour garantir l'intégrité référentielle stricte de PostgreSQL.
+- Support des portées de données (`scope_type` et `scope_id`) dans `UserRole` pour restreindre facilement les rôles à un site, un entrepôt ou une caisse, comme requis dans `ARCHITECTURE.md`.
+- Réinitialisation systématique du `TenantContext` dans `TestCase::tearDown()` pour garantir l'indépendance totale des tests unitaires.
 
 ## Problèmes
 - Aucun problème bloquant.
