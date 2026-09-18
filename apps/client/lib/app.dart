@@ -5,6 +5,7 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/auth/services/auth_service.dart';
 import 'features/catalog/presentation/catalog_page.dart';
 import 'features/dashboard/presentation/dashboard_page.dart';
+import 'features/stock/presentation/stock_page.dart';
 
 class EurocasionApp extends StatefulWidget {
   const EurocasionApp({super.key});
@@ -61,6 +62,7 @@ class _AppShellState extends State<AppShell> {
     final page = switch (_selectedIndex) {
       0 => const DashboardPage(),
       1 => const CatalogPage(),
+      2 => const StockPage(),
       _ => const _ComingSoonPage(),
     };
 

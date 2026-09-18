@@ -175,4 +175,42 @@ class CatalogTest extends TestCase
         // Product is soft deleted in database, not permanently deleted
         $this->assertSoftDeleted('products', ['id' => $productId]);
     }
+
+    public function test_product_auto_sku_generation_manufacturer_and_initial_quantity(): void
+    {
+        $response = $this->withHeader('Authorization', "Bearer {$this->token}")
+            ->postJson('/api/v1/products', [
+                'name' => 'MacBook Air M2 256Go',
+                'manufacturer' => 'Apple',
+                'category_name' => 'Ordinateurs Laptops',
+                'base_unit_id' => $this->unit->id,
+                'state' => 'used',
+                'quantity' => 5,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.name', 'MacBook Air M2 256Go')
+            ->assertJsonPath('data.manufacturer', 'Apple')
+            ->assertJsonPath('data.category.name', 'Ordinateurs Laptops')
+            ->assertJsonPath('data.total_on_hand', '5.0000');
+
+        $sku = $response->json('data.sku');
+        $this->assertNotEmpty($sku);
+        $this->assertStringStartsWith('SKU-APP-', $sku);
+
+        // Verify stock movement and balance were created
+        $productId = $response->json('data.id');
+        $this->assertDatabaseHas('stock_balances', [
+            'tenant_id' => $this->tenant->id,
+            'product_id' => $productId,
+            'on_hand' => 5,
+        ]);
+
+        $this->assertDatabaseHas('stock_movements', [
+            'tenant_id' => $this->tenant->id,
+            'product_id' => $productId,
+            'type' => 'receipt',
+            'quantity' => 5,
+        ]);
+    }
 }

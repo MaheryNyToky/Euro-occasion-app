@@ -136,6 +136,7 @@ class DatabaseSeeder extends Seeder
                 'category_id' => $catTel->id,
                 'base_unit_id' => $unitPce->id,
                 'reference' => 'A2890',
+                'manufacturer' => 'Apple',
                 'name' => 'iPhone 14 Pro 128Go',
                 'description' => 'Smartphone Apple écran 6.1" Super Retina XDR ProMotion, Dynamic Island.',
                 'state' => 'used',
@@ -168,12 +169,13 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        Product::withoutGlobalScopes()->firstOrCreate(
+        $p2 = Product::withoutGlobalScopes()->firstOrCreate(
             ['tenant_id' => $tenant->id, 'sku' => 'DELL-5420-I7'],
             [
                 'category_id' => $catInfo->id,
                 'base_unit_id' => $unitPce->id,
                 'reference' => 'LAT-5420-REF',
+                'manufacturer' => 'Dell',
                 'name' => 'Dell Latitude 5420 Core i7',
                 'description' => 'PC Portable reconditionné grade A+, 16Go RAM, 512Go SSD NVMe, Windows 11 Pro.',
                 'state' => 'refurbished',
@@ -184,12 +186,13 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        Product::withoutGlobalScopes()->firstOrCreate(
+        $p3 = Product::withoutGlobalScopes()->firstOrCreate(
             ['tenant_id' => $tenant->id, 'sku' => 'CABLE-USBC-100W'],
             [
                 'category_id' => $catElec->id,
                 'base_unit_id' => $unitPce->id,
                 'reference' => 'CB-100W-2M',
+                'manufacturer' => 'Baseus',
                 'name' => 'Câble USB-C Power Delivery 100W 2m',
                 'description' => 'Câble renforcé nylon tressé charge rapide 100W et transfert de données.',
                 'state' => 'new',
@@ -198,6 +201,30 @@ class DatabaseSeeder extends Seeder
                 'alert_threshold' => 10,
                 'is_active' => true,
             ]
+        );
+
+        // 7b. Stock initial
+        $defaultSite = \App\Models\Site::withoutGlobalScopes()->firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'SITE-MAIN'],
+            ['name' => 'Site Principal Antananarivo', 'is_active' => true]
+        );
+
+        $defaultWarehouse = \App\Models\Warehouse::withoutGlobalScopes()->firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'WH-MAIN'],
+            ['site_id' => $defaultSite->id, 'name' => 'Magasin Principal', 'is_active' => true]
+        );
+
+        \App\Models\StockBalance::withoutGlobalScopes()->updateOrCreate(
+            ['tenant_id' => $tenant->id, 'product_id' => $p1->id, 'warehouse_id' => $defaultWarehouse->id],
+            ['on_hand' => 8]
+        );
+        \App\Models\StockBalance::withoutGlobalScopes()->updateOrCreate(
+            ['tenant_id' => $tenant->id, 'product_id' => $p2->id, 'warehouse_id' => $defaultWarehouse->id],
+            ['on_hand' => 4]
+        );
+        \App\Models\StockBalance::withoutGlobalScopes()->updateOrCreate(
+            ['tenant_id' => $tenant->id, 'product_id' => $p3->id, 'warehouse_id' => $defaultWarehouse->id],
+            ['on_hand' => 30]
         );
 
         // 8. Suppliers

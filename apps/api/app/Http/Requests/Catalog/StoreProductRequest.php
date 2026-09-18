@@ -19,7 +19,7 @@ class StoreProductRequest extends FormRequest
 
         return [
             'sku' => [
-                'required',
+                'nullable',
                 'string',
                 'max:100',
                 Rule::unique('products', 'sku')->where('tenant_id', $tenantId),
@@ -27,7 +27,10 @@ class StoreProductRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'base_unit_id' => ['required', 'uuid', 'exists:units,id'],
             'category_id' => ['nullable', 'uuid', 'exists:categories,id'],
+            'category_name' => ['nullable', 'string', 'max:150'],
+            'manufacturer' => ['nullable', 'string', 'max:100'],
             'reference' => ['nullable', 'string', 'max:100'],
+            'quantity' => ['nullable', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
             'state' => ['nullable', 'string', 'in:new,used,refurbished,damaged'],
             'alert_threshold' => ['nullable', 'numeric', 'min:0'],

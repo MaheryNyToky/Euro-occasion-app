@@ -22,6 +22,7 @@ class Product extends Model
         'base_unit_id',
         'sku',
         'reference',
+        'manufacturer',
         'name',
         'description',
         'state',
@@ -54,6 +55,11 @@ class Product extends Model
     public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
+    }
+
+    public function stockBalances(): HasMany
+    {
+        return $this->hasMany(StockBalance::class);
     }
 
     /**

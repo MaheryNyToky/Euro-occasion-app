@@ -91,6 +91,7 @@ class ProductVariantModel {
 class ProductModel {
   final String id;
   final String sku;
+  final String? manufacturer;
   final String? reference;
   final String name;
   final String? description;
@@ -98,6 +99,7 @@ class ProductModel {
   final bool hasVariants;
   final bool requiresSerialNumber;
   final double alertThreshold;
+  final double totalOnHand;
   final bool isActive;
   final UnitModel? baseUnit;
   final CategoryModel? category;
@@ -106,6 +108,7 @@ class ProductModel {
   ProductModel({
     required this.id,
     required this.sku,
+    this.manufacturer,
     this.reference,
     required this.name,
     this.description,
@@ -113,6 +116,7 @@ class ProductModel {
     required this.hasVariants,
     required this.requiresSerialNumber,
     required this.alertThreshold,
+    this.totalOnHand = 0.0,
     required this.isActive,
     this.baseUnit,
     this.category,
@@ -129,6 +133,7 @@ class ProductModel {
     return ProductModel(
       id: json['id'] ?? '',
       sku: json['sku'] ?? '',
+      manufacturer: json['manufacturer'] ?? json['reference'],
       reference: json['reference'],
       name: json['name'] ?? '',
       description: json['description'],
@@ -136,6 +141,7 @@ class ProductModel {
       hasVariants: json['has_variants'] ?? false,
       requiresSerialNumber: json['requires_serial_number'] ?? false,
       alertThreshold: (json['alert_threshold'] != null) ? double.tryParse(json['alert_threshold'].toString()) ?? 0.0 : 0.0,
+      totalOnHand: (json['total_on_hand'] != null) ? double.tryParse(json['total_on_hand'].toString()) ?? 0.0 : 0.0,
       isActive: json['is_active'] ?? true,
       baseUnit: json['base_unit'] is Map ? UnitModel.fromJson(json['base_unit']) : null,
       category: json['category'] is Map ? CategoryModel.fromJson(json['category']) : null,

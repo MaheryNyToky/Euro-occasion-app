@@ -91,120 +91,6 @@ class _CatalogPageState extends State<CatalogPage> {
     _loadDataForCurrentTab();
   }
 
-  void _showAddProductDialog() {
-    final nameCtrl = TextEditingController();
-    final skuCtrl = TextEditingController();
-    final refCtrl = TextEditingController();
-    final alertCtrl = TextEditingController(text: '0');
-    String selectedState = 'new';
-    String? selectedCategoryId = _categories.isNotEmpty ? _categories.first.id : null;
-    String? selectedUnitId = _units.isNotEmpty ? _units.first.id : null;
-
-    if (_units.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez d\'abord créer au moins une unité de mesure.')),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Nouveau Produit'),
-          content: SizedBox(
-            width: 460,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom du produit *')),
-                  const SizedBox(height: 12),
-                  TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'Code SKU *', hintText: 'ex: IPHONE-14-128')),
-                  const SizedBox(height: 12),
-                  TextField(controller: refCtrl, decoration: const InputDecoration(labelText: 'Référence fabricant')),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedState,
-                    decoration: const InputDecoration(labelText: 'État du produit'),
-                    items: const [
-                      DropdownMenuItem(value: 'new', child: Text('Neuf')),
-                      DropdownMenuItem(value: 'used', child: Text('Occasion')),
-                      DropdownMenuItem(value: 'refurbished', child: Text('Reconditionné')),
-                      DropdownMenuItem(value: 'damaged', child: Text('Endommagé')),
-                    ],
-                    onChanged: (v) => setDialogState(() => selectedState = v ?? 'new'),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_categories.isNotEmpty)
-                    DropdownButtonFormField<String?>(
-                      initialValue: selectedCategoryId,
-                      decoration: const InputDecoration(labelText: 'Catégorie'),
-                      items: [
-                        const DropdownMenuItem(value: null, child: Text('Aucune')),
-                        ..._categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
-                      ],
-                      onChanged: (v) => setDialogState(() => selectedCategoryId = v),
-                    ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedUnitId,
-                    decoration: const InputDecoration(labelText: 'Unité de base *'),
-                    items: _units.map((u) => DropdownMenuItem(value: u.id, child: Text('${u.name} (${u.code})'))).toList(),
-                    onChanged: (v) => setDialogState(() => selectedUnitId = v),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: alertCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Seuil d\'alerte stock'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-            FilledButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty || skuCtrl.text.trim().isEmpty || selectedUnitId == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Veuillez remplir les champs obligatoires (*)')),
-                  );
-                  return;
-                }
-
-                Navigator.pop(ctx);
-                try {
-                  await CatalogService.instance.createProduct({
-                    'name': nameCtrl.text.trim(),
-                    'sku': skuCtrl.text.trim(),
-                    'reference': refCtrl.text.trim().isEmpty ? null : refCtrl.text.trim(),
-                    'state': selectedState,
-                    'category_id': selectedCategoryId,
-                    'base_unit_id': selectedUnitId,
-                    'alert_threshold': double.tryParse(alertCtrl.text.trim()) ?? 0,
-                  });
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Produit créé avec succès dans l\'ERP.')),
-                  );
-                  _loadDataForCurrentTab();
-                } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-                  );
-                }
-              },
-              child: const Text('Enregistrer'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -230,13 +116,6 @@ class _CatalogPageState extends State<CatalogPage> {
                 icon: const Icon(Icons.refresh),
                 onPressed: _isLoading ? null : _loadDataForCurrentTab,
               ),
-              const SizedBox(width: 8),
-              if (_tab == 0)
-                FilledButton.icon(
-                  onPressed: _showAddProductDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Nouveau produit'),
-                ),
             ],
           ),
           const SizedBox(height: 26),
@@ -381,19 +260,32 @@ class _CatalogPageState extends State<CatalogPage> {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('PRODUIT')),
+                DataColumn(label: Text('PRODUIT & FABRICANT')),
                 DataColumn(label: Text('SKU')),
                 DataColumn(label: Text('CATÉGORIE')),
                 DataColumn(label: Text('UNITÉ')),
                 DataColumn(label: Text('ÉTAT')),
+                DataColumn(label: Text('EN STOCK')),
                 DataColumn(label: Text('VARIANTES')),
                 DataColumn(label: Text('ACTIONS')),
               ],
               rows: _products.map((product) {
+                final isOutOfStock = product.totalOnHand <= 0;
                 return DataRow(
                   cells: [
-                    DataCell(Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold))),
-                    DataCell(Text(product.sku)),
+                    DataCell(Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        if (product.manufacturer != null && product.manufacturer!.isNotEmpty)
+                          Text(
+                            product.manufacturer!,
+                            style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
+                          ),
+                      ],
+                    )),
+                    DataCell(Text(product.sku, style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
                     DataCell(Text(product.category?.name ?? '—')),
                     DataCell(Text(product.baseUnit?.code ?? '—')),
                     DataCell(Container(
@@ -405,6 +297,20 @@ class _CatalogPageState extends State<CatalogPage> {
                       child: Text(
                         product.stateLabel,
                         style: TextStyle(color: _getStateColor(product.state), fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                    )),
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isOutOfStock ? Colors.red.withValues(alpha: 0.12) : Colors.green.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        product.totalOnHand.toStringAsFixed(0),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isOutOfStock ? Colors.red.shade800 : Colors.green.shade800,
+                        ),
                       ),
                     )),
                     DataCell(Text(product.variants.isNotEmpty ? '${product.variants.length}' : '—')),
