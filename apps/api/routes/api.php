@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\HealthController;
-use Illuminate\Http\Request;
+use App\Http\Middleware\AuthenticateWithTenant;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -10,12 +12,17 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// Public routes
 Route::get('/health', HealthController::class);
+Route::post('/auth/login', [AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me', function (Request $request) {
-        return response()->json([
-            'data' => $request->user()->load('tenant'),
-        ]);
-    });
+// Authenticated routes with tenant context and device checking
+Route::middleware(['auth:sanctum', AuthenticateWithTenant::class])->group(function () {
+    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+
+    // Devices management
+    Route::get('/devices', [DeviceController::class, 'index']);
+    Route::delete('/devices/{id}', [DeviceController::class, 'destroy']);
 });

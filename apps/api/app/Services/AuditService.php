@@ -26,7 +26,22 @@ class AuditService
 
         $resolvedTenantId = $tenantId ?? TenantContext::getTenantId();
         $resolvedUserId = $userId ?? ($request?->user()?->id ?? null);
-        $resolvedDeviceId = $deviceId ?? ($request?->header('X-Device-Id') ?? null);
+        
+        $resolvedDeviceId = null;
+        if (!empty($deviceId)) {
+            $resolvedDeviceId = Str::isUuid($deviceId) 
+                ? $deviceId 
+                : \App\Models\Device::withoutGlobalScopes()
+                    ->where('tenant_id', $resolvedTenantId)
+                    ->where('device_identifier', $deviceId)
+                    ->value('id');
+        } elseif ($headerDeviceId = $request?->header('X-Device-Id')) {
+            $resolvedDeviceId = \App\Models\Device::withoutGlobalScopes()
+                ->where('tenant_id', $resolvedTenantId)
+                ->where('device_identifier', $headerDeviceId)
+                ->value('id');
+        }
+
         $requestId = $request?->attributes?->get('request_id') ?? (string) Str::uuid();
 
         return AuditEvent::create([
