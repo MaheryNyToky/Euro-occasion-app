@@ -11,21 +11,14 @@ Phase 0 — Fondations, initialisation du dépôt et structure monorepo
 Terminé
 
 ## Modifications
-- Initialisation du dépôt Git local
-- Création du `.gitignore` racine adapté (macOS, Laravel, Flutter, Docker, IDEs, logs, secrets)
-- Création de l'arborescence des dossiers conforme à `docs/ARCHITECTURE.md` section 4 (`apps/api`, `apps/client`, `packages/`, `database/`, `infra/`, `tests/`, `.github/workflows/`)
-- Configuration Docker Compose locale dans `infra/docker` (PostgreSQL 16, Redis 7, MinIO S3, Mailpit) avec `quay.io/minio/minio:latest`
-- Validation locale des conteneurs démarrés avec succès
+- Initialisation du dépôt Git local et push sur GitHub
+- Création du `.gitignore` racine adapté
+- Création de l'arborescence des dossiers conforme à `docs/ARCHITECTURE.md`
+- Configuration Docker Compose locale dans `infra/docker` (PostgreSQL 16, Redis 7, MinIO S3, Mailpit)
 - Workflow CI minimal dans `.github/workflows/ci.yml`
 
 ## Tests
-- Validation syntaxique et structurelle `docker compose config` : Succès
-- Démarrage effectif des conteneurs via Docker : PostgreSQL (5432), Redis (6379), MinIO (9000/9001), Mailpit (1025/8025) tous sains et en cours d'exécution
-- Vérification de l'arborescence des dossiers et git status : Propre
-
-## Décisions
-- MinIO configuré depuis `quay.io/minio/minio:latest` pour le stockage objet privé S3.
-- PostgreSQL 16 et Redis 7 configurés avec healthchecks et volumes persistants.
+- `docker compose config` et démarrage sain des 4 conteneurs.
 
 ## Problèmes
 - Aucun.
@@ -39,34 +32,17 @@ Phase 1 — Base technique multi-tenant (Backend Laravel & Client Flutter)
 Terminé
 
 ## Modifications
-- **Backend Laravel (`apps/api`)** :
-  - Installation de Laravel 12 avec PHP 8.4
-  - Installation et configuration de Laravel Sanctum (`composer.json`, `config/sanctum.php`, `personal_access_tokens`)
-  - Configuration de l'environnement pour PostgreSQL 16 (`DB_CONNECTION=pgsql`), Redis 7 (`QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`), Mailpit SMTP et MinIO S3 (`apps/api/.env`)
-  - Middleware de traçabilité globale `EnsureRequestId` (`apps/api/app/Http/Middleware/EnsureRequestId.php`)
-  - Formatage JSON standardisé avec corrélation `request_id` dans `bootstrap/app.php`
-  - Migrations PostgreSQL avec clés primaires UUID :
-    - `0001_01_01_000000_create_tenants_table.php`
-    - `0001_01_01_000001_create_users_table.php`
-    - `0001_01_01_000002_create_devices_table.php`
-    - `0001_01_01_000003_create_audit_events_table.php`
-    - `2026_09_18_212659_create_personal_access_tokens_table.php`
-  - Modèles Eloquent & Services (`Tenant`, `User`, `Device`, `AuditEvent`, `BelongsToTenant`, `TenantScope`, `TenantContext`, `AuditService`)
-  - Endpoint `/api/v1/health` avec vérification de PostgreSQL et Redis
-- **Client Flutter (`apps/client`)** :
-  - Application multiplateforme Windows, Android, Web initialisée
-  - Architecture feature-first configurée (`app_config.dart`)
-- **Tests** :
-  - `HealthCheckTest`, `TenantIsolationTest`, `AuditEventTest` (6 tests, 27 assertions : tous validés sur PostgreSQL)
-  - `flutter test` et `flutter analyze` réussis sans avertissement
+- Backend Laravel 12 configuré avec PostgreSQL 16 et Redis 7
+- Middleware `EnsureRequestId` pour traçabilité HTTP avec en-tête `X-Request-Id`
+- Migrations PostgreSQL UUID pour `tenants`, `users`, `devices`, `audit_events`
+- Modèles `Tenant`, `User`, `Device`, `AuditEvent` avec `BelongsToTenant` et `TenantScope`
+- Enregistrement append-only strict pour l'audit
+- Healthcheck `GET /api/v1/health`
+- Client Flutter multiplateforme initialisé
 
 ## Tests
 - PHPUnit / PostgreSQL : 6/6 passés.
-- Flutter : 1/1 passé, 0 analyse issue.
-
-## Décisions
-- Clés primaires UUID généralisées.
-- Interdiction stricte de mise à jour et suppression des événements d'audit (append-only immuable).
+- Flutter : tests et analyse sans avertissement.
 
 ## Problèmes
 - Aucun.
@@ -80,37 +56,55 @@ Phase 2 — Authentification, sessions d'appareils et permissions (RBAC & Périm
 Terminé
 
 ## Modifications
-- **Schéma RBAC PostgreSQL (`database/migrations/0001_01_01_000004_create_rbac_tables.php`)** :
-  - Table `permissions` (UUID, nom, code unique, catégorie, description)
-  - Table `roles` (UUID, tenant_id nullable, nom, code unique par tenant, is_system)
-  - Table pivot `role_permissions` (role_id, permission_id)
-  - Table `user_roles` (UUID, tenant_id, user_id, role_id, `scope_type`, `scope_id`) pour le support des portées de données
-- **Modèles Eloquent & Autorisation** :
-  - Modèles `Permission`, `Role`, `UserRole`
-  - Méthodes sur `User` : `assignRole()`, `hasRole()`, `hasPermissionTo($permission, $scopeType, $scopeId)`, `getAllPermissions()`
-- **Sécurité, Middleware & Rate Limiting** :
-  - `LoginRequest` avec limitation de débit (5 tentatives par minute par IP/email)
-  - `AuthenticateWithTenant` middleware validant l'état actif de l'utilisateur, l'état actif du tenant, initialisant le `TenantContext`, et bloquant tout appareil révoqué (`is_revoked === true`)
-  - `CheckPermission` middleware pour protéger les routes avec vérification des permissions et portées de périmètre
-  - Gestion des exceptions dans `bootstrap/app.php` (401, 403, 404, 422, 500 corrélées par `request_id`)
-  - Résolution robuste et sécurisée de `device_id` en UUID dans `AuditService`
-- **Contrôleurs et Routes API** :
-  - `AuthController` (`login`, `refresh`, `logout`, `me`) avec journalisation d'audit automatique (`auth.login`, `auth.logout`) et enregistrement d'appareil
-  - `DeviceController` (`index`, `destroy`) avec révocation d'appareil et invalidation de ses jetons d'accès
-  - Routes exposées sous `/api/v1/auth/*` et `/api/v1/devices`
-- **Tests** :
-  - `AuthTest` : 7 tests (login réussi avec terminal, rejet mauvais identifiants/tenant/statut, me, refresh de token, révocation à la déconnexion)
-  - `DeviceManagementTest` : 1 test complet (liste des appareils, révocation, blocage 403 d'un appareil révoqué avec audit)
-  - `PermissionTest` : 2 tests complets (permission globale, protection permission sensible, permission restreinte à un scope entrepôt avec refus sur un autre entrepôt)
+- Migration RBAC `0001_01_01_000004_create_rbac_tables.php` (`permissions`, `roles`, `role_permissions`, `user_roles`) avec support des portées (`scope_type`, `scope_id`)
+- Modèles `Role`, `Permission`, `UserRole` et méthodes d'autorisation enrichies sur `User`
+- Middleware `AuthenticateWithTenant` avec gestion des terminaux révoqués et scoping automatique
+- Middleware `CheckPermission` pour vérification fine des droits et portées
+- Contrôleurs `AuthController` et `DeviceController`
+- Routes d'authentification et de gestion d'appareils sous `/api/v1`
 
 ## Tests
-- PHPUnit / PostgreSQL (`eurocasion_testing`) : **16 tests, 89 assertions, 100% passés**.
+- PHPUnit / PostgreSQL : 16/16 passés.
+
+## Problèmes
+- Aucun.
+
+---
+
+## Étape
+Phase 3 — Catalogue et référentiels (Unités, Catégories, Produits, Variantes, Fournisseurs, Clients)
+
+## Statut
+Terminé
+
+## Modifications
+- **Migrations PostgreSQL avec clés UUID & contraintes par tenant** :
+  - `0001_01_01_000005_create_units_and_conversions_tables.php` (`units`, `unit_conversions`)
+  - `0001_01_01_000006_create_catalog_tables.php` (`categories` hiérarchiques avec clé étrangère auto-référencée, `attributes`, `attribute_values`, `products`, `product_variants` avec attributs JSONB)
+  - `0001_01_01_000007_create_partners_tables.php` (`suppliers`, `customers`)
+- **Modèles Eloquent & Services** :
+  - Modèles `Unit`, `UnitConversion`, `Category`, `Attribute`, `AttributeValue`, `Product`, `ProductVariant`, `Supplier`, `Customer`
+  - Service mathématique précis `UnitConversionService` (conversions directes et inverses avec respect des précisions décimales)
+  - Méthode `$product->archive()` pour archivage logique sécurisé (soft delete sans perte d'historique)
+- **Contrôleurs et FormRequests** :
+  - `UnitController` : listing et création d'unités et de règles de conversion
+  - `CategoryController` : gestion arborescente parent/enfant
+  - `ProductController` : listing filtré (catégorie, état, recherche plein texte), création transactionnelle avec variantes, détail, mise à jour et archivage
+  - `SupplierController` et `CustomerController` : référentiels partenaires avec suivi des conditions de règlement et limites de crédit
+  - Validation fine de l'unicité SKU/Code par tenant (`StoreProductRequest`, `Rule::unique()->where('tenant_id')`)
+  - Réinitialisation automatique du `TenantContext` au début de chaque requête dans `EnsureRequestId`
+- **Tests** :
+  - `UnitConversionTest` : conversion d'unités directes, inverses et gestion des erreurs de conversion manquante
+  - `CatalogTest` : arborescence de catégories, création de produit avec variantes, unicité de SKU par tenant (autorisant le même SKU dans deux tenants différents), et archivage
+  - `PartnerTest` : CRUD et étanchéité stricte des données partenaires entre tenants
+
+## Tests
+- PHPUnit / PostgreSQL (`eurocasion_testing`) : **20 tests, 117 assertions, 100% passés**.
 - Flutter (`apps/client`) : `flutter test` réussi, `flutter analyze` sans avertissement (`No issues found!`).
 
 ## Décisions
-- Résolution du `X-Device-Id` textuel vers l'UUID `id` dans la table `devices` pour garantir l'intégrité référentielle stricte de PostgreSQL.
-- Support des portées de données (`scope_type` et `scope_id`) dans `UserRole` pour restreindre facilement les rôles à un site, un entrepôt ou une caisse, comme requis dans `ARCHITECTURE.md`.
-- Réinitialisation systématique du `TenantContext` dans `TestCase::tearDown()` pour garantir l'indépendance totale des tests unitaires.
+- Réinitialisation systématique de `TenantContext::clear()` dans le middleware `EnsureRequestId` au début de chaque requête HTTP pour garantir une étanchéité parfaite lors des appels séquentiels.
+- Intégration de l'état du produit (`state`: `new`, `used`, `refurbished`, `damaged`) directement dans le modèle `Product` pour répondre aux spécificités de gestion d'Eurocasion (occasion / reconditionné / neuf).
 
 ## Problèmes
-- Aucun problème bloquant.
+- Aucun.

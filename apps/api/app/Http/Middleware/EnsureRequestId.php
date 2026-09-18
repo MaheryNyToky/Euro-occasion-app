@@ -15,6 +15,8 @@ class EnsureRequestId
      */
     public function handle(Request $request, Closure $next): Response
     {
+        \App\Services\TenantContext::clear();
+
         $requestId = $request->header('X-Request-Id');
 
         if (empty($requestId) || !Str::isUuid($requestId)) {
