@@ -1,30 +1,36 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:eurocasion_client/main.dart';
+import 'package:eurocasion_client/app.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('affiche l\'ecran de connexion par defaut', (WidgetTester tester) async {
+    await tester.pumpWidget(const EurocasionApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Eurocasion ERP'), findsOneWidget);
+    expect(find.text('Gestion de stock, importations et caisse'), findsOneWidget);
+    expect(find.text('Code Entreprise'), findsOneWidget);
+    expect(find.text('Adresse e-mail'), findsOneWidget);
+    expect(find.text('Mot de passe'), findsOneWidget);
+    expect(find.text('Se connecter'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('affiche le shell et tableau de bord une fois connecte', (WidgetTester tester) async {
+    // Set a wide surface size to simulate desktop view
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AppShell(),
+      ),
+    );
+
+    expect(find.text('Tableau de bord'), findsAtLeastNWidgets(1));
+    expect(find.text('Actions rapides'), findsOneWidget);
+    expect(find.text('Catalogue'), findsOneWidget);
+    expect(find.text('Stock'), findsOneWidget);
+    expect(find.text('Ventes'), findsOneWidget);
   });
 }

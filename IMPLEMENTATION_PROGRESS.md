@@ -8,20 +8,7 @@ Suivi des étapes d'implémentation de l'application selon `docs/ARCHITECTURE.md
 Phase 0 — Fondations, initialisation du dépôt et structure monorepo
 
 ## Statut
-Terminé
-
-## Modifications
-- Initialisation du dépôt Git local et push sur GitHub
-- Création du `.gitignore` racine adapté
-- Création de l'arborescence des dossiers conforme à `docs/ARCHITECTURE.md`
-- Configuration Docker Compose locale dans `infra/docker` (PostgreSQL 16, Redis 7, MinIO S3, Mailpit)
-- Workflow CI minimal dans `.github/workflows/ci.yml`
-
-## Tests
-- `docker compose config` et démarrage sain des 4 conteneurs.
-
-## Problèmes
-- Aucun.
+Terminé (Poussé sur GitHub)
 
 ---
 
@@ -29,23 +16,7 @@ Terminé
 Phase 1 — Base technique multi-tenant (Backend Laravel & Client Flutter)
 
 ## Statut
-Terminé
-
-## Modifications
-- Backend Laravel 12 configuré avec PostgreSQL 16 et Redis 7
-- Middleware `EnsureRequestId` pour traçabilité HTTP avec en-tête `X-Request-Id`
-- Migrations PostgreSQL UUID pour `tenants`, `users`, `devices`, `audit_events`
-- Modèles `Tenant`, `User`, `Device`, `AuditEvent` avec `BelongsToTenant` et `TenantScope`
-- Enregistrement append-only strict pour l'audit
-- Healthcheck `GET /api/v1/health`
-- Client Flutter multiplateforme initialisé
-
-## Tests
-- PHPUnit / PostgreSQL : 6/6 passés.
-- Flutter : tests et analyse sans avertissement.
-
-## Problèmes
-- Aucun.
+Terminé (Poussé sur GitHub)
 
 ---
 
@@ -53,21 +24,7 @@ Terminé
 Phase 2 — Authentification, sessions d'appareils et permissions (RBAC & Périmètres)
 
 ## Statut
-Terminé
-
-## Modifications
-- Migration RBAC `0001_01_01_000004_create_rbac_tables.php` (`permissions`, `roles`, `role_permissions`, `user_roles`) avec support des portées (`scope_type`, `scope_id`)
-- Modèles `Role`, `Permission`, `UserRole` et méthodes d'autorisation enrichies sur `User`
-- Middleware `AuthenticateWithTenant` avec gestion des terminaux révoqués et scoping automatique
-- Middleware `CheckPermission` pour vérification fine des droits et portées
-- Contrôleurs `AuthController` et `DeviceController`
-- Routes d'authentification et de gestion d'appareils sous `/api/v1`
-
-## Tests
-- PHPUnit / PostgreSQL : 16/16 passés.
-
-## Problèmes
-- Aucun.
+Terminé (Poussé sur GitHub)
 
 ---
 
@@ -75,36 +32,52 @@ Terminé
 Phase 3 — Catalogue et référentiels (Unités, Catégories, Produits, Variantes, Fournisseurs, Clients)
 
 ## Statut
-Terminé
+Terminé (Poussé sur GitHub)
+
+---
+
+## Étape
+Phase 3 — Frontend du catalogue et connexion Flutter aux APIs Laravel
+
+## Statut
+Terminé (Prêt pour revue utilisateur)
 
 ## Modifications
-- **Migrations PostgreSQL avec clés UUID & contraintes par tenant** :
-  - `0001_01_01_000005_create_units_and_conversions_tables.php` (`units`, `unit_conversions`)
-  - `0001_01_01_000006_create_catalog_tables.php` (`categories` hiérarchiques avec clé étrangère auto-référencée, `attributes`, `attribute_values`, `products`, `product_variants` avec attributs JSONB)
-  - `0001_01_01_000007_create_partners_tables.php` (`suppliers`, `customers`)
-- **Modèles Eloquent & Services** :
-  - Modèles `Unit`, `UnitConversion`, `Category`, `Attribute`, `AttributeValue`, `Product`, `ProductVariant`, `Supplier`, `Customer`
-  - Service mathématique précis `UnitConversionService` (conversions directes et inverses avec respect des précisions décimales)
-  - Méthode `$product->archive()` pour archivage logique sécurisé (soft delete sans perte d'historique)
-- **Contrôleurs et FormRequests** :
-  - `UnitController` : listing et création d'unités et de règles de conversion
-  - `CategoryController` : gestion arborescente parent/enfant
-  - `ProductController` : listing filtré (catégorie, état, recherche plein texte), création transactionnelle avec variantes, détail, mise à jour et archivage
-  - `SupplierController` et `CustomerController` : référentiels partenaires avec suivi des conditions de règlement et limites de crédit
-  - Validation fine de l'unicité SKU/Code par tenant (`StoreProductRequest`, `Rule::unique()->where('tenant_id')`)
-  - Réinitialisation automatique du `TenantContext` au début de chaque requête dans `EnsureRequestId`
-- **Tests** :
-  - `UnitConversionTest` : conversion d'unités directes, inverses et gestion des erreurs de conversion manquante
-  - `CatalogTest` : arborescence de catégories, création de produit avec variantes, unicité de SKU par tenant (autorisant le même SKU dans deux tenants différents), et archivage
-  - `PartnerTest` : CRUD et étanchéité stricte des données partenaires entre tenants
+- **Client réseau et API** : Mise en place de `ApiClient` avec gestion dynamique de la `baseUrl`, ajout automatique des en-têtes obligatoires (`X-Request-Id` UUID v4, `X-Device-Id`, `Authorization: Bearer <token>`), et normalisation des erreurs.
+- **Authentification & Session** :
+  - `AuthService` et `UserSession` (stockage de session en mémoire, parsing de l'utilisateur, rôles, permissions et informations du tenant).
+  - `LoginScreen` responsive Material 3 avec validation de formulaire, configuration de l'URL API, gestion d'erreur visuelle et pré-remplissage des identifiants de développement.
+  - Intégration dans `app.dart` (`EurocasionApp` & `AppShell`) : bascule automatique vers `LoginScreen` si non connecté, affichage dynamique de l'utilisateur connecté et du tenant dans l'en-tête de bureau et la barre latérale, et action de déconnexion fonctionnelle (`AuthService.instance.logout()`).
+- **Services Catalogue et Partenaires** :
+  - `CatalogService` : méthodes typées `getProducts()`, `getProduct()`, `getCategories()`, `getUnits()`, `createProduct()`, `archiveProduct()`.
+  - `PartnerService` : méthodes typées `getSuppliers()`, `createSupplier()`, `getCustomers()`, `createCustomer()`.
+  - `CatalogModels` & `PartnerModels` : modèles Dart avec sérialisation JSON complète, formatage des devises et statuts d'état (`Neuf`, `Occasion`, `Reconditionné`, `Endommagé`).
+- **Écran Catalogue (`CatalogPage`)** :
+  - Rendu en direct des produits avec filtres combinés (recherche texte sur nom/SKU/référence, filtre par état).
+  - Modal d'ajout de produit connecté à l'API (`POST /api/v1/products`) avec sélection d'unité de mesure et catégorie dynamiques.
+  - Archivage de produit avec dialogue de confirmation (`POST /api/v1/products/{id}/archive`).
+  - Vues en tableau pour les catégories, unités avec précisions, fournisseurs et clients avec devises et limites de crédit.
+- **Données de développement (`DatabaseSeeder.php`)** :
+  - Tenant `eurocasion` (Eurocasion Madagascar, MGA).
+  - Rôles RBAC et compte `admin@eurocasion.mg` (`SecretPass123!`).
+  - Référentiel complet d'unités (`PCE`, `KG`, `L`, `CRT` avec conversion 10 PCE/CRT).
+  - Catégories hiérarchiques (`ELEC`, `TEL`, `INFO`, `AUTO`).
+  - Produits réels avec variantes (ex. iPhone 14 Pro avec variantes Noir Sidéral et Or, Dell Latitude reconditionné, Câbles).
+  - Fournisseurs internationaux et locaux, et clients B2B / B2C.
 
 ## Tests
-- PHPUnit / PostgreSQL (`eurocasion_testing`) : **20 tests, 117 assertions, 100% passés**.
-- Flutter (`apps/client`) : `flutter test` réussi, `flutter analyze` sans avertissement (`No issues found!`).
+- `flutter analyze` : 0 problème détecté (aucune erreur, aucun avertissement, aucune dépréciation).
+- `flutter test` : 3/3 tests passés avec succès (`widget_test.dart` et `catalog_page_test.dart`).
+- `php artisan test` : 20/20 tests passés (117 assertions).
+- Appels API end-to-end vérifiés via `curl` et environnement de développement :
+  - `POST /api/v1/auth/login` : 200 OK avec token Sanctionné, tenant et utilisateur.
+  - `GET /api/v1/products` : 200 OK avec liste paginée de produits, variantes et unités.
+  - `GET /api/v1/suppliers` & `GET /api/v1/customers` : 200 OK.
 
-## Décisions
-- Réinitialisation systématique de `TenantContext::clear()` dans le middleware `EnsureRequestId` au début de chaque requête HTTP pour garantir une étanchéité parfaite lors des appels séquentiels.
-- Intégration de l'état du produit (`state`: `new`, `used`, `refurbished`, `damaged`) directement dans le modèle `Product` pour répondre aux spécificités de gestion d'Eurocasion (occasion / reconditionné / neuf).
+---
 
-## Problèmes
-- Aucun.
+## Étape
+Phase 4 — Stock transactionnel connecté (Sites, Entrepôts, Emplacements, Balances, Mouvements atomiques, Séries & Lots)
+
+## Statut
+En attente de validation de la Phase 3 frontend
