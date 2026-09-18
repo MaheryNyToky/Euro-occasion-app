@@ -36,8 +36,23 @@ void main() {
     expect(find.text('Catégorie (saisie libre ou existante)'), findsOneWidget);
     expect(find.text('Quantité reçue en stock *'), findsOneWidget);
 
+    // Verify observation field
+    expect(find.text('Observation (facultatif)'), findsOneWidget);
+
     // Verify "seuil alerte" is NOT present
     expect(find.text('Seuil d\'alerte stock'), findsNothing);
     expect(find.text('Référence fabricant'), findsNothing);
+
+    // Select "Carton" in Unit dropdown
+    await tester.tap(find.text('Pièce (PCE)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Carton (CRT)').last);
+    await tester.pumpAndSettle();
+
+    // Verify Carton custom packaging field appears
+    expect(find.text('Nombre de pièces par carton *'), findsOneWidget);
+    expect(find.textContaining('Équivalence :'), findsOneWidget);
+    expect(find.text('Nombre de cartons reçus *'), findsOneWidget);
   });
 }
+

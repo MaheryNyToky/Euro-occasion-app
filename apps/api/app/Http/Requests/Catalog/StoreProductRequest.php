@@ -31,6 +31,8 @@ class StoreProductRequest extends FormRequest
             'manufacturer' => ['nullable', 'string', 'max:100'],
             'reference' => ['nullable', 'string', 'max:100'],
             'quantity' => ['nullable', 'numeric', 'min:0'],
+            'pieces_per_carton' => ['nullable', 'numeric', 'min:1'],
+            'observation' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
             'state' => ['nullable', 'string', 'in:new,used,refurbished,damaged'],
             'alert_threshold' => ['nullable', 'numeric', 'min:0'],

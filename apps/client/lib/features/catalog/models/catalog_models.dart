@@ -95,6 +95,8 @@ class ProductModel {
   final String? reference;
   final String name;
   final String? description;
+  final String? observation;
+  final double? piecesPerCarton;
   final String state; // new, used, refurbished, damaged
   final bool hasVariants;
   final bool requiresSerialNumber;
@@ -112,6 +114,8 @@ class ProductModel {
     this.reference,
     required this.name,
     this.description,
+    this.observation,
+    this.piecesPerCarton,
     required this.state,
     required this.hasVariants,
     required this.requiresSerialNumber,
@@ -137,6 +141,8 @@ class ProductModel {
       reference: json['reference'],
       name: json['name'] ?? '',
       description: json['description'],
+      observation: json['observation'],
+      piecesPerCarton: json['pieces_per_carton'] != null ? double.tryParse(json['pieces_per_carton'].toString()) : null,
       state: json['state'] ?? 'new',
       hasVariants: json['has_variants'] ?? false,
       requiresSerialNumber: json['requires_serial_number'] ?? false,

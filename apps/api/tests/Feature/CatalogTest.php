@@ -213,4 +213,38 @@ class CatalogTest extends TestCase
             'quantity' => 5,
         ]);
     }
+
+    public function test_product_creation_with_observation_and_carton_packaging(): void
+    {
+        $response = $this->withHeader('Authorization', "Bearer {$this->token}")
+            ->postJson('/api/v1/products', [
+                'name' => 'Câble USB-C tressé 2m',
+                'manufacturer' => 'Baseus',
+                'base_unit_id' => $this->unit->id,
+                'state' => 'new',
+                'quantity' => 10,
+                'pieces_per_carton' => 24,
+                'observation' => 'Livraison fournisseur lot B - vérifié conforme',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.pieces_per_carton', '24.00')
+            ->assertJsonPath('data.observation', 'Livraison fournisseur lot B - vérifié conforme');
+
+        $productId = $response->json('data.id');
+
+        $this->assertDatabaseHas('products', [
+            'id' => $productId,
+            'pieces_per_carton' => 24,
+            'observation' => 'Livraison fournisseur lot B - vérifié conforme',
+        ]);
+
+        $this->assertDatabaseHas('stock_movements', [
+            'tenant_id' => $this->tenant->id,
+            'product_id' => $productId,
+            'type' => 'receipt',
+            'reason' => 'Stock initial à la création du produit (24.00 pcs/carton) — Livraison fournisseur lot B - vérifié conforme',
+        ]);
+    }
 }
+

@@ -100,7 +100,7 @@ class DatabaseSeeder extends Seeder
 
         $unitCarton = Unit::withoutGlobalScopes()->firstOrCreate(
             ['tenant_id' => $tenant->id, 'code' => 'CRT'],
-            ['name' => 'Carton (10 pcs)', 'precision' => 0, 'is_base' => false, 'is_active' => true]
+            ['name' => 'Carton', 'precision' => 0, 'is_base' => false, 'is_active' => true]
         );
 
         UnitConversion::firstOrCreate(

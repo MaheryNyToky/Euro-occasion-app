@@ -145,6 +145,14 @@ class ProductController extends Controller
                     'on_hand' => $initialQty,
                 ]);
 
+                $movementReason = 'Stock initial à la création du produit';
+                if (!empty($product->pieces_per_carton)) {
+                    $movementReason .= " ({$product->pieces_per_carton} pcs/carton)";
+                }
+                if (!empty($product->observation)) {
+                    $movementReason .= ' — ' . $product->observation;
+                }
+
                 StockMovement::create([
                     'tenant_id' => $product->tenant_id,
                     'type' => 'receipt',
@@ -152,7 +160,7 @@ class ProductController extends Controller
                     'quantity' => $initialQty,
                     'base_unit_id' => $product->base_unit_id,
                     'destination_warehouse_id' => $warehouse->id,
-                    'reason' => 'Stock initial à la création du produit',
+                    'reason' => $movementReason,
                     'actor_id' => auth()->id(),
                 ]);
             }
@@ -201,6 +209,8 @@ class ProductController extends Controller
             'name' => ['sometimes', 'string', 'max:255'],
             'manufacturer' => ['nullable', 'string', 'max:100'],
             'reference' => ['nullable', 'string', 'max:100'],
+            'observation' => ['nullable', 'string'],
+            'pieces_per_carton' => ['nullable', 'numeric', 'min:1'],
             'category_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'description' => ['nullable', 'string'],
             'state' => ['sometimes', 'string', 'in:new,used,refurbished,damaged'],

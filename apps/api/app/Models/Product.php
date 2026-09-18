@@ -25,6 +25,8 @@ class Product extends Model
         'manufacturer',
         'name',
         'description',
+        'observation',
+        'pieces_per_carton',
         'state',
         'has_variants',
         'requires_serial_number',
@@ -38,6 +40,7 @@ class Product extends Model
             'has_variants' => 'boolean',
             'requires_serial_number' => 'boolean',
             'alert_threshold' => 'decimal:4',
+            'pieces_per_carton' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }

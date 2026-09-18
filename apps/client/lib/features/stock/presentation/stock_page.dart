@@ -105,7 +105,10 @@ class _StockPageState extends State<StockPage> {
   void _showAddStockDialog() {
     final availableUnits = _units.isNotEmpty
         ? _units
-        : [UnitModel(id: 'default-pce', code: 'PCE', name: 'Pièce', precision: 0, isBase: true)];
+        : [
+            UnitModel(id: 'default-pce', code: 'PCE', name: 'Pièce', precision: 0, isBase: true),
+            UnitModel(id: 'default-crt', code: 'CRT', name: 'Carton', precision: 0, isBase: false),
+          ];
 
     String selectedName = '';
     String selectedManufacturer = '';
@@ -113,6 +116,8 @@ class _StockPageState extends State<StockPage> {
     String selectedState = 'new';
     String? selectedUnitId = availableUnits.first.id;
     final qtyController = TextEditingController(text: '1');
+    final piecesPerCartonController = TextEditingController(text: '12');
+    final observationController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     // Combine database product names with suggestions
@@ -126,7 +131,15 @@ class _StockPageState extends State<StockPage> {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
+        builder: (ctx, setDialogState) {
+          final selectedUnit = availableUnits.firstWhere(
+            (u) => u.id == selectedUnitId,
+            orElse: () => availableUnits.first,
+          );
+          final isCarton = selectedUnit.code.toUpperCase() == 'CRT' ||
+              selectedUnit.name.toLowerCase().contains('carton');
+
+          return AlertDialog(
           title: const Row(
             children: [
               Icon(Icons.add_box_outlined, color: AppColors.primary),
@@ -316,25 +329,97 @@ class _StockPageState extends State<StockPage> {
                         ),
                       ],
                     ),
+
+                    // Configuration carton personnalisée
+                    if (isCarton) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: piecesPerCartonController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre de pièces par carton *',
+                          hintText: 'Ex: 10, 12, 24, 50...',
+                          prefixIcon: Icon(Icons.layers_outlined),
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          helperText: 'Précisez le conditionnement de ce produit',
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                        validator: (v) {
+                          if (!isCarton) return null;
+                          if (v == null || v.trim().isEmpty) return 'Précisez le nombre de pièces';
+                          final num = double.tryParse(v.trim());
+                          if (num == null || num <= 0) return 'Nombre invalide (> 0)';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Builder(
+                        builder: (context) {
+                          final cartons = double.tryParse(qtyController.text.trim()) ?? 0;
+                          final pcs = double.tryParse(piecesPerCartonController.text.trim()) ?? 0;
+                          final totalPcs = cartons * pcs;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.calculate_outlined, size: 20, color: Colors.amber.shade900),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Équivalence : ${cartons.toStringAsFixed(cartons.truncateToDouble() == cartons ? 0 : 2)} carton(s) × ${pcs.toStringAsFixed(0)} pcs = ${totalPcs.toStringAsFixed(0)} pièces au total',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.brown.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 14),
 
                     // Quantité
                     TextFormField(
                       controller: qtyController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Quantité reçue en stock *',
-                        hintText: 'Ex: 1, 5, 20',
-                        prefixIcon: Icon(Icons.inventory_outlined),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: isCarton ? 'Nombre de cartons reçus *' : 'Quantité reçue en stock *',
+                        hintText: isCarton ? 'Ex: 5, 10' : 'Ex: 1, 5, 20',
+                        prefixIcon: const Icon(Icons.inventory_outlined),
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
+                      onChanged: (_) => setDialogState(() {}),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Quantité requise';
                         final num = double.tryParse(v.trim());
                         if (num == null || num < 0) return 'Quantité invalide';
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Observation facultative
+                    TextFormField(
+                      controller: observationController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Observation (facultatif)',
+                        hintText: 'Remarques (état du colis, fournisseur, lot...)',
+                        prefixIcon: Icon(Icons.note_alt_outlined),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
                     ),
                   ],
                 ),
@@ -356,14 +441,27 @@ class _StockPageState extends State<StockPage> {
 
                 Navigator.pop(ctx);
                 try {
-                  final createdProduct = await CatalogService.instance.createProduct({
+                  final Map<String, dynamic> payload = {
                     'name': selectedName.trim(),
                     'manufacturer': selectedManufacturer.trim().isNotEmpty ? selectedManufacturer.trim() : null,
                     'category_name': selectedCategoryName.trim().isNotEmpty ? selectedCategoryName.trim() : null,
                     'state': selectedState,
                     'base_unit_id': selectedUnitId,
                     'quantity': double.tryParse(qtyController.text.trim()) ?? 1,
-                  });
+                  };
+
+                  if (observationController.text.trim().isNotEmpty) {
+                    payload['observation'] = observationController.text.trim();
+                  }
+
+                  if (isCarton) {
+                    final pcs = double.tryParse(piecesPerCartonController.text.trim());
+                    if (pcs != null && pcs > 0) {
+                      payload['pieces_per_carton'] = pcs;
+                    }
+                  }
+
+                  final createdProduct = await CatalogService.instance.createProduct(payload);
 
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -384,7 +482,8 @@ class _StockPageState extends State<StockPage> {
               },
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }
@@ -629,6 +728,32 @@ class _StockPageState extends State<StockPage> {
                                       product.manufacturer!,
                                       style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
                                     ),
+                                  if (product.observation != null && product.observation!.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Tooltip(
+                                      message: product.observation!,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.notes, size: 12, color: Colors.blueGrey.shade600),
+                                          const SizedBox(width: 4),
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 180),
+                                            child: Text(
+                                              product.observation!,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontStyle: FontStyle.italic,
+                                                color: Colors.blueGrey.shade600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               )),
                               DataCell(Text(
@@ -664,7 +789,11 @@ class _StockPageState extends State<StockPage> {
                                   ),
                                 ),
                               )),
-                              DataCell(Text(product.baseUnit?.code ?? '—')),
+                              DataCell(Text(
+                                product.piecesPerCarton != null && product.piecesPerCarton! > 0
+                                    ? '${product.baseUnit?.code ?? "CRT"} (${product.piecesPerCarton!.toStringAsFixed(0)} pcs/ctn)'
+                                    : (product.baseUnit?.code ?? '—'),
+                              )),
                               DataCell(IconButton(
                                 icon: const Icon(Icons.archive_outlined, size: 18, color: Colors.grey),
                                 tooltip: 'Archiver',
