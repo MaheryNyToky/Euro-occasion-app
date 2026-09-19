@@ -77,4 +77,47 @@ Terminé (Ajustements UX & Stock validés)
 Phase 4 — Stock transactionnel connecté (Sites, Entrepôts, Emplacements, Balances, Mouvements atomiques, Séries & Lots)
 
 ## Statut
-Prêt à démarrer
+En cours — quatre tickets verticaux livrés
+
+## Tickets livrés
+
+1. **Mouvements atomiques de stock** :
+   - Ajout de `POST /api/v1/stock-movements` pour les mouvements `receipt`, `issue` et `transfer`.
+   - Transaction atomique avec verrouillage des balances (`lockForUpdate`), contrôle du disponible et respect de `allow_negative_stock`.
+   - Validation tenant-aware des produits, variantes, entrepôts et emplacements.
+   - Idempotence via `Idempotency-Key` ou `idempotency_key` et audit métier des mouvements créés (`stock.movement_created`).
+
+2. **Contre-opération append-only (Inversion)** :
+   - Ajout de `POST /api/v1/stock-movements/{id}/reverse` pour inverser un mouvement existant sans mise à jour ni suppression (ADR-005).
+   - Inversion automatique source/destination, débit/crédit et contrôle du stock disponible non négatif.
+   - Protection stricte : interdiction de contre-passer deux fois un même mouvement, interdiction d'inverser une contre-opération.
+   - Lien direct `reversed_movement_id`, relation `reversal()` / `reversedMovement()`, support de l'idempotence et journalisation d'audit (`stock.movement_reversed`).
+
+3. **Consultation des mouvements et projections de stock** :
+   - `GET /api/v1/stock-movements` : liste paginée et filtrée (produit, entrepôt source ou destination, type, acteur, plage de dates). Eager loading ciblé des relations.
+   - `GET /api/v1/stock-balances` : projection paginée (produit, entrepôt, variante, emplacement, `available_only`). Champ calculé `available = on_hand - reserved - damaged` inclus dans chaque ligne de réponse.
+   - 14 nouveaux tests ciblés PHPUnit (70 assertions) ; suite complète API : 47/47 réussis, 258 assertions.
+
+4. **Raccordement Flutter du stock** :
+   - Ajout de `GET /api/v1/warehouses` pour sélectionner un entrepôt actif lors
+     d'une réception.
+   - `StockPage` crée désormais le produit sans stock initial puis envoie un
+     mouvement `receipt` transactionnel avec une clé d'idempotence.
+   - Les balances de `GET /api/v1/stock-balances` alimentent le total affiché
+     par produit.
+   - Ajout d'un onglet **Historique** alimenté par
+     `GET /api/v1/stock-movements`.
+   - Modèles et `StockService` Flutter ajoutés pour entrepôts, balances et
+     mouvements.
+
+## Tests du raccordement
+
+- `flutter analyze` : aucun problème.
+- `flutter test test/stock_page_test.dart` : 1/1 réussi.
+- `php artisan test tests/Feature/StockQueryTest.php tests/Feature/StockMovementTest.php` : 26/26 réussis, 130 assertions.
+
+## Prochain ticket
+
+Opérations de stock avancées — Phase 4 : gérer les emplacements, lots et séries
+dans le flux de réception, en commençant par la sélection d'un emplacement et
+la validation des numéros de série lorsque `requires_serial_number` est actif.

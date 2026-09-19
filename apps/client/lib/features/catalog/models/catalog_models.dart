@@ -43,7 +43,9 @@ class CategoryModel {
     var rawChildren = json['children'];
     List<CategoryModel> childrenList = [];
     if (rawChildren is List) {
-      childrenList = rawChildren.map((c) => CategoryModel.fromJson(c as Map<String, dynamic>)).toList();
+      childrenList = rawChildren
+          .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+          .toList();
     }
 
     return CategoryModel(
@@ -82,7 +84,9 @@ class ProductVariantModel {
       barcode: json['barcode'],
       qrCode: json['qr_code'],
       name: json['name'],
-      attributeValues: json['attribute_values'] is Map ? Map<String, dynamic>.from(json['attribute_values']) : null,
+      attributeValues: json['attribute_values'] is Map
+          ? Map<String, dynamic>.from(json['attribute_values'])
+          : null,
       isActive: json['is_active'] ?? true,
     );
   }
@@ -131,7 +135,9 @@ class ProductModel {
     var rawVariants = json['variants'];
     List<ProductVariantModel> variantList = [];
     if (rawVariants is List) {
-      variantList = rawVariants.map((v) => ProductVariantModel.fromJson(v as Map<String, dynamic>)).toList();
+      variantList = rawVariants
+          .map((v) => ProductVariantModel.fromJson(v as Map<String, dynamic>))
+          .toList();
     }
 
     return ProductModel(
@@ -142,15 +148,25 @@ class ProductModel {
       name: json['name'] ?? '',
       description: json['description'],
       observation: json['observation'],
-      piecesPerCarton: json['pieces_per_carton'] != null ? double.tryParse(json['pieces_per_carton'].toString()) : null,
+      piecesPerCarton: json['pieces_per_carton'] != null
+          ? double.tryParse(json['pieces_per_carton'].toString())
+          : null,
       state: json['state'] ?? 'new',
       hasVariants: json['has_variants'] ?? false,
       requiresSerialNumber: json['requires_serial_number'] ?? false,
-      alertThreshold: (json['alert_threshold'] != null) ? double.tryParse(json['alert_threshold'].toString()) ?? 0.0 : 0.0,
-      totalOnHand: (json['total_on_hand'] != null) ? double.tryParse(json['total_on_hand'].toString()) ?? 0.0 : 0.0,
+      alertThreshold: (json['alert_threshold'] != null)
+          ? double.tryParse(json['alert_threshold'].toString()) ?? 0.0
+          : 0.0,
+      totalOnHand: (json['total_on_hand'] != null)
+          ? double.tryParse(json['total_on_hand'].toString()) ?? 0.0
+          : 0.0,
       isActive: json['is_active'] ?? true,
-      baseUnit: json['base_unit'] is Map ? UnitModel.fromJson(json['base_unit']) : null,
-      category: json['category'] is Map ? CategoryModel.fromJson(json['category']) : null,
+      baseUnit: json['base_unit'] is Map
+          ? UnitModel.fromJson(json['base_unit'])
+          : null,
+      category: json['category'] is Map
+          ? CategoryModel.fromJson(json['category'])
+          : null,
       variants: variantList,
     );
   }
@@ -168,5 +184,27 @@ class ProductModel {
       default:
         return state;
     }
+  }
+
+  ProductModel copyWith({double? totalOnHand}) {
+    return ProductModel(
+      id: id,
+      sku: sku,
+      manufacturer: manufacturer,
+      reference: reference,
+      name: name,
+      description: description,
+      observation: observation,
+      piecesPerCarton: piecesPerCarton,
+      state: state,
+      hasVariants: hasVariants,
+      requiresSerialNumber: requiresSerialNumber,
+      alertThreshold: alertThreshold,
+      totalOnHand: totalOnHand ?? this.totalOnHand,
+      isActive: isActive,
+      baseUnit: baseUnit,
+      category: category,
+      variants: variants,
+    );
   }
 }

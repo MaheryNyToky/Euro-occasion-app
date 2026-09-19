@@ -99,10 +99,14 @@ start_flutter() {
   [[ -f "$CLIENT_DIR/pubspec.yaml" ]] || fail "application Flutter introuvable dans $CLIENT_DIR"
   command -v flutter >/dev/null 2>&1 || fail "commande introuvable : flutter"
 
-  log "démarrage de Flutter Web sur http://$WEB_HOST:$WEB_PORT"
+  local api_url="http://$API_HOST:$API_PORT/api/v1"
+  log "démarrage de Flutter Web sur http://$WEB_HOST:$WEB_PORT (API → $api_url)"
   (
     cd "$CLIENT_DIR"
-    exec flutter run -d web-server --web-hostname "$WEB_HOST" --web-port "$WEB_PORT"
+    exec flutter run -d web-server \
+      --web-hostname "$WEB_HOST" \
+      --web-port "$WEB_PORT" \
+      --dart-define="API_BASE_URL=$api_url"
   ) >"$FLUTTER_LOG" 2>&1 &
   printf '%s' "$!" > "$FLUTTER_PID_FILE"
 }

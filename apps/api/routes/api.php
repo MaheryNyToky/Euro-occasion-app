@@ -7,6 +7,9 @@ use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\StockBalanceController;
+use App\Http\Controllers\StockMovementController;
+use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\UnitController;
 use App\Http\Middleware\AuthenticateWithTenant;
 use Illuminate\Support\Facades\Route;
@@ -47,6 +50,15 @@ Route::middleware(['auth:sanctum', AuthenticateWithTenant::class])->group(functi
     Route::get('/products/{id}', [ProductController::class, 'show']);
     Route::patch('/products/{id}', [ProductController::class, 'update']);
     Route::post('/products/{id}/archive', [ProductController::class, 'archive']);
+
+    // Transactional stock commands & queries
+    Route::get('/stock-movements', [StockMovementController::class, 'index']);
+    Route::post('/stock-movements', [StockMovementController::class, 'store']);
+    Route::post('/stock-movements/{id}/reverse', [StockMovementController::class, 'reverse']);
+
+    // Stock balances projection
+    Route::get('/stock-balances', [StockBalanceController::class, 'index']);
+    Route::get('/warehouses', [WarehouseController::class, 'index']);
 
     // Suppliers & Customers
     Route::get('/suppliers', [SupplierController::class, 'index']);

@@ -123,5 +123,6 @@ Donner à la fin :
 - Préférer les petites modifications aux réécritures complètes.
 - Never run `git push` unless the user explicitly asks for it in the current conversation.
 - If a request is ambiguous or missing critical details, ask a short clarifying question before editing files or changing behavior.
+- Les implementations ainsi que les tickets sont dans IMPLEMENTATION_PROGRESS.md . Tu n'écris dans RESUME.md que quand je le demande explicitement
 - When a push is performed, the final summary must explicitly state the target repository URL and branch, and clearly say that the changes were pushed to that repository.
 

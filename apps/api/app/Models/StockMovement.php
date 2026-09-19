@@ -6,6 +6,7 @@ use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use RuntimeException;
 
 class StockMovement extends Model
@@ -96,5 +97,10 @@ class StockMovement extends Model
     public function reversedMovement(): BelongsTo
     {
         return $this->belongsTo(StockMovement::class, 'reversed_movement_id');
+    }
+
+    public function reversal(): HasOne
+    {
+        return $this->hasOne(StockMovement::class, 'reversed_movement_id');
     }
 }

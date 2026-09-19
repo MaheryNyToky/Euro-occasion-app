@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../catalog/models/catalog_models.dart';
 import '../../catalog/services/catalog_service.dart';
+import '../models/stock_models.dart';
+import '../services/stock_service.dart';
 
 class StockPage extends StatefulWidget {
   const StockPage({super.key});
@@ -15,6 +17,9 @@ class _StockPageState extends State<StockPage> {
   List<ProductModel> _products = [];
   List<CategoryModel> _categories = [];
   List<UnitModel> _units = [];
+  List<WarehouseModel> _warehouses = [];
+  List<StockMovementModel> _movements = [];
+  int _selectedTabIndex = 0;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -82,13 +87,24 @@ class _StockPageState extends State<StockPage> {
         ),
         CatalogService.instance.getCategories(),
         CatalogService.instance.getUnits(),
+        StockService.instance.getWarehouses(),
+        StockService.instance.getBalances(),
+        StockService.instance.getMovements(),
       ]);
 
       if (mounted) {
+        final products = res[0] as List<ProductModel>;
+        final balances = res[4] as List<StockBalanceModel>;
+        final totals = <String, double>{};
+        for (final balance in balances) {
+          totals[balance.productId] = (totals[balance.productId] ?? 0) + balance.onHand;
+        }
         setState(() {
-          _products = res[0] as List<ProductModel>;
+          _products = products.map((product) => product.copyWith(totalOnHand: totals[product.id] ?? 0)).toList();
           _categories = res[1] as List<CategoryModel>;
           _units = res[2] as List<UnitModel>;
+          _warehouses = res[3] as List<WarehouseModel>;
+          _movements = res[5] as List<StockMovementModel>;
         });
       }
     } catch (e) {
@@ -441,13 +457,20 @@ class _StockPageState extends State<StockPage> {
 
                 Navigator.pop(ctx);
                 try {
+                  if (_warehouses.isEmpty) {
+                    throw StateError('Aucun entrepôt actif n’est disponible pour cette réception.');
+                  }
+
+                  final cartonsOrUnits = double.tryParse(qtyController.text.trim()) ?? 1;
+                  final pieces = isCarton ? (double.tryParse(piecesPerCartonController.text.trim()) ?? 1) : 1;
+                  final receivedQuantity = cartonsOrUnits * pieces;
                   final Map<String, dynamic> payload = {
                     'name': selectedName.trim(),
                     'manufacturer': selectedManufacturer.trim().isNotEmpty ? selectedManufacturer.trim() : null,
                     'category_name': selectedCategoryName.trim().isNotEmpty ? selectedCategoryName.trim() : null,
                     'state': selectedState,
                     'base_unit_id': selectedUnitId,
-                    'quantity': double.tryParse(qtyController.text.trim()) ?? 1,
+                    'quantity': 0,
                   };
 
                   if (observationController.text.trim().isNotEmpty) {
@@ -462,13 +485,18 @@ class _StockPageState extends State<StockPage> {
                   }
 
                   final createdProduct = await CatalogService.instance.createProduct(payload);
+                  await StockService.instance.receive(
+                    productId: createdProduct.id,
+                    warehouseId: _warehouses.first.id,
+                    quantity: receivedQuantity,
+                  );
 
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       backgroundColor: Colors.green.shade800,
                       content: Text(
-                        'Produit "${createdProduct.name}" ajouté avec succès ! SKU généré : ${createdProduct.sku} (Stock : ${createdProduct.totalOnHand.toStringAsFixed(0)})',
+                        'Produit "${createdProduct.name}" ajouté avec succès ! SKU généré : ${createdProduct.sku} (Stock : ${receivedQuantity.toStringAsFixed(0)})',
                       ),
                     ),
                   );
@@ -503,14 +531,54 @@ class _StockPageState extends State<StockPage> {
     }
   }
 
+  Widget _buildMovementHistory() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Historique des mouvements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            const Text('Réceptions, sorties, transferts et contre-opérations enregistrés.', style: TextStyle(color: AppColors.muted)),
+            const SizedBox(height: 18),
+            if (_movements.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(28),
+                child: Center(child: Text('Aucun mouvement enregistré.', style: TextStyle(color: AppColors.muted))),
+              )
+            else
+              ..._movements.map((movement) {
+                final route = [movement.sourceWarehouseName, movement.destinationWarehouseName]
+                    .whereType<String>()
+                    .join(' → ');
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.background,
+                    child: Icon(movement.type == 'issue' ? Icons.remove : Icons.add, color: AppColors.primary),
+                  ),
+                  title: Text('${movement.typeLabel} · ${movement.productName}'),
+                  subtitle: Text([route, movement.reason ?? ''].where((item) => item.isNotEmpty).join(' · ')),
+                  trailing: Text(movement.quantity.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.bold)),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalUnits = _products.fold<double>(0.0, (acc, p) => acc + p.totalOnHand);
     final outOfStockCount = _products.where((p) => p.totalOnHand <= 0).length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(30),
-      child: Column(
+    return DefaultTabController(
+      length: 2,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(30),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -544,6 +612,17 @@ class _StockPageState extends State<StockPage> {
             ],
           ),
           const SizedBox(height: 24),
+
+          TabBar(
+            tabs: const [
+              Tab(text: 'Stock actuel'),
+              Tab(text: 'Historique'),
+            ],
+            onTap: (index) => setState(() => _selectedTabIndex = index),
+          ),
+          const SizedBox(height: 20),
+
+          if (_selectedTabIndex == 1) _buildMovementHistory() else ...[
 
           // KPI Cards
           Row(
@@ -824,7 +903,9 @@ class _StockPageState extends State<StockPage> {
               ),
             ),
           ),
+          ],
         ],
+        ),
       ),
     );
   }
